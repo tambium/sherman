@@ -1,0 +1,7 @@
+{
+  "name": "@tambium/sherman",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ]
+}
