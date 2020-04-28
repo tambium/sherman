@@ -49,79 +49,77 @@ const initialState = {
 };
 
 const reducer = (state: State, action: Action) => {
+  let cp = { ...state };
+  let local, remote;
+  const sender = (clock: Clock) =>
+    send({
+      localClock: clock,
+      now: clock.logical + 1,
+    });
+
   switch (action.type) {
     case "local-event":
-      const localCp = { ...state };
-      const localNow = localCp.nodes[action.nodeId].clock.logical;
-      const leClock = send({
-        localClock: localCp.nodes[action.nodeId].clock,
-        now: localNow + 1,
-      });
+      cp = { ...state };
+      local = cp.nodes[action.nodeId].clock;
+      let clock = sender(local);
 
-      localCp.nodes[action.nodeId] = {
-        ...localCp.nodes[action.nodeId],
-        clock: leClock,
+      cp.nodes[action.nodeId] = {
+        ...cp.nodes[action.nodeId],
+        clock,
 
         events: [
-          ...localCp.nodes[action.nodeId].events,
+          ...cp.nodes[action.nodeId].events,
           {
-            eventId: `${leClock.logical}:${leClock.counter}:${action.nodeId}`,
-            clock: leClock,
+            eventId: `${clock.logical}:${clock.counter}:${action.nodeId}`,
+            clock,
           },
         ],
       };
 
-      return {
-        ...state,
-      };
+      return cp;
     case "send-event":
-      const sendCp = { ...state };
-      const sourceNow = sendCp.nodes[action.sourceNodeId].clock.logical;
-      const destinationNow =
-        sendCp.nodes[action.destinationNodeId].clock.logical;
-      const sendLocalClock = send({
-        localClock: sendCp.nodes[action.sourceNodeId].clock,
-        now: sourceNow + 1,
-      });
-      const sendRemoteClock = receive({
-        localClock: sendCp.nodes[action.destinationNodeId].clock,
+      cp = { ...state };
+      local = cp.nodes[action.sourceNodeId].clock;
+      remote = cp.nodes[action.destinationNodeId].clock;
+      let localClock = sender(local);
+
+      let remoteClock = receive({
+        localClock: remote,
         remoteClock: {
-          ...sendCp.nodes[action.sourceNodeId].clock,
-          logical: sourceNow + 1,
+          ...local,
+          logical: local.logical + 1,
         },
-        now: destinationNow + 1,
+        now: remote.logical + 1,
       });
 
       // handle "local" part of send event
-      sendCp.nodes[action.sourceNodeId] = {
-        ...sendCp.nodes[action.sourceNodeId],
-        clock: sendLocalClock,
+      cp.nodes[action.sourceNodeId] = {
+        ...cp.nodes[action.sourceNodeId],
+        clock: localClock,
 
         events: [
-          ...sendCp.nodes[action.sourceNodeId].events,
+          ...cp.nodes[action.sourceNodeId].events,
           {
-            eventId: `${sendLocalClock.logical}:${sendLocalClock.counter}:${action.sourceNodeId}`,
-            clock: sendLocalClock,
+            eventId: `${localClock.logical}:${localClock.counter}:${action.sourceNodeId}`,
+            clock: localClock,
           },
         ],
       };
 
       // handle "remote" part of send event
-      sendCp.nodes[action.destinationNodeId] = {
-        ...sendCp.nodes[action.destinationNodeId],
-        clock: sendRemoteClock,
+      cp.nodes[action.destinationNodeId] = {
+        ...cp.nodes[action.destinationNodeId],
+        clock: remoteClock,
         events: [
-          ...sendCp.nodes[action.destinationNodeId].events,
+          ...cp.nodes[action.destinationNodeId].events,
           {
-            eventId: `${sendRemoteClock.logical}:${sendRemoteClock.counter}:${action.destinationNodeId}`,
-            clock: sendRemoteClock,
+            eventId: `${remoteClock.logical}:${remoteClock.counter}:${action.destinationNodeId}`,
+            clock: remoteClock,
           },
         ],
       };
 
-      return {
-        ...state,
-      };
+      return cp;
     default:
       throw new Error();
   }
