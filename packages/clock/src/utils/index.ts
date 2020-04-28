@@ -1,6 +1,6 @@
-import { compareClocks } from "./compareClocks";
-import { handleReceivedEvent } from "./handleReceivedEvent";
-import { handleSendEvent } from "./handleSendEvent";
-import { initializeClock } from "./initializeClock";
+import { compare } from "./compare";
+import { initialize } from "./initialize";
+import { receive } from "./receive";
+import { send } from "./send";
 
-export { compareClocks, handleReceivedEvent, handleSendEvent, initializeClock };
+export { compare, initialize, receive, send };
