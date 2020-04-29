@@ -6,7 +6,7 @@
   "module": "src/index.ts",
   "license": "MIT",
   "scripts": {
-    "build": "tsc -p ./tsconfig.json",
+    "build": "rm -rf dist && tsc -p ./tsconfig.json",
     "start": "parcel index.html"
   },
   "devDependencies": {
