@@ -1,14 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import {
-  Clock,
-  compare,
-  initialize,
-  receive,
-  send,
-} from "../../../packages/clock";
+import { Clock, receive, send } from "../../../packages/clock";
 import { INode, Node } from "./components/node";
 import { Event, IEvent } from "./components/event";
+import { GlobalStyle } from "./components/global-style";
+import { compareEvents, createEventId } from "./utils/event";
+import { createNode } from "./utils/node";
 
 type State = {
   nodes: { [key: string]: INode };
@@ -22,33 +19,11 @@ type Action =
       type: "send-event";
     };
 
-const compareEvents = (first: IEvent, second: IEvent) => {
-  return compare(first.clock, second.clock);
-};
-
-const createEventId = (clock: Clock, nodeId: string): string => {
-  return `${clock.logical}:${clock.counter}:${nodeId}`;
-};
-
-const createNode = (nodeId: string, now: number) => {
-  let clock = initialize({ nodeId, now });
-  return {
-    clock,
-    events: [
-      {
-        clock,
-        eventId: createEventId(clock, nodeId),
-      },
-    ],
-    nodeId,
-  };
-};
-
 const initialState = {
   nodes: {
-    a: createNode("a", 10),
-    b: createNode("b", 0),
-    c: createNode("c", 5),
+    A: createNode("A", 10),
+    B: createNode("B", 0),
+    C: createNode("C", 5),
   },
 };
 
@@ -134,30 +109,34 @@ export const App = () => {
   const [state, dispatch] = React.useReducer(reducer, initialState);
 
   return (
-    <div css={{ display: "flex" }}>
-      <div css={{ display: "flex", marginRight: 16 }}>
+    <div css={{ display: "flex", flexWrap: "wrap" }}>
+      <div css={{ display: "flex", flexWrap: "wrap", marginRight: 16 }}>
         {Object.keys(state.nodes).map((nodeId) => (
-          <Node
-            handleLocalEvent={() => {
-              dispatch({
-                nodeId,
-                type: "local-event",
-              });
-            }}
-            handleSendEvent={(destinationNodeId) => {
-              dispatch({
-                type: "send-event",
-                sourceNodeId: nodeId,
-                destinationNodeId: destinationNodeId,
-              });
-            }}
-            key={nodeId}
-            node={state.nodes[nodeId]}
-            nodeIds={Object.keys(state.nodes)}
-          />
+          <div css={{ padding: 8 }} key={nodeId}>
+            <Node
+              handleLocalEvent={() => {
+                dispatch({
+                  nodeId,
+                  type: "local-event",
+                });
+              }}
+              handleSendEvent={(destinationNodeId) => {
+                dispatch({
+                  type: "send-event",
+                  sourceNodeId: nodeId,
+                  destinationNodeId: destinationNodeId,
+                });
+              }}
+              node={state.nodes[nodeId]}
+              nodeIds={Object.keys(state.nodes)}
+            />
+          </div>
         ))}
       </div>
-      <div>
+      <div css={{ padding: 8 }}>
+        <div css={{ fontWeight: 600, fontSize: 18, marginBottom: 8 }}>
+          Event log
+        </div>
         {([] as IEvent[])
           .concat(
             ...Object.keys(state.nodes).map(
@@ -174,4 +153,10 @@ export const App = () => {
 };
 
 const rootElement = document.getElementById("root");
-ReactDOM.render(<App />, rootElement);
+ReactDOM.render(
+  <React.Fragment>
+    <GlobalStyle />
+    <App />
+  </React.Fragment>,
+  rootElement
+);

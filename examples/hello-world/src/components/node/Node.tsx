@@ -18,7 +18,7 @@ export const Node: React.FC<NodeProps> = ({
   const { counter, logical } = clock;
 
   return (
-    <div css={{ padding: 8 }}>
+    <React.Fragment>
       <div css={{ fontWeight: 600, fontSize: 18, marginBottom: 8 }}>
         Node {nodeId}
       </div>
@@ -30,18 +30,21 @@ export const Node: React.FC<NodeProps> = ({
       <div css={{ display: "flex", flexDirection: "column" }}>
         {nodeIds
           .filter((nodeId) => nodeId !== node.nodeId)
-          .map((destinationNodeId) => (
-            <button
-              css={{ marginBottom: 4 }}
-              onClick={() => handleSendEvent(destinationNodeId)}
-              key={destinationNodeId}
-            >
-              Send event to {destinationNodeId}
-            </button>
-          ))}
+          .map((destinationNodeId) => {
+            console.log(destinationNodeId);
+            return (
+              <button
+                css={{ marginBottom: 4 }}
+                onClick={() => handleSendEvent(destinationNodeId)}
+                key={destinationNodeId}
+              >
+                Send event to {destinationNodeId}
+              </button>
+            );
+          })}
 
         <button onClick={handleLocalEvent}>Local event</button>
       </div>
-    </div>
+    </React.Fragment>
   );
 };
