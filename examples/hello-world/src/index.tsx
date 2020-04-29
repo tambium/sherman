@@ -26,6 +26,10 @@ const compareEvents = (first: IEvent, second: IEvent) => {
   return compare(first.clock, second.clock);
 };
 
+const createEventId = (clock: Clock, nodeId: string): string => {
+  return `${clock.logical}:${clock.counter}:${nodeId}`;
+};
+
 const createNode = (nodeId: string, now: number) => {
   let clock = initialize({ nodeId, now });
   return {
@@ -33,7 +37,7 @@ const createNode = (nodeId: string, now: number) => {
     events: [
       {
         clock,
-        eventId: `${clock.logical}:${clock.counter}:${nodeId}`,
+        eventId: createEventId(clock, nodeId),
       },
     ],
     nodeId,
@@ -44,18 +48,19 @@ const initialState = {
   nodes: {
     a: createNode("a", 10),
     b: createNode("b", 0),
-    c: createNode("c", 3),
+    c: createNode("c", 5),
   },
 };
 
 const reducer = (state: State, action: Action) => {
   let cp = { ...state };
   let local, remote;
-  const sender = (clock: Clock) =>
-    send({
+  const sender = (clock: Clock) => {
+    return send({
       localClock: clock,
       now: clock.logical + 1,
     });
+  };
 
   switch (action.type) {
     case "local-event":
@@ -70,7 +75,7 @@ const reducer = (state: State, action: Action) => {
         events: [
           ...cp.nodes[action.nodeId].events,
           {
-            eventId: `${clock.logical}:${clock.counter}:${action.nodeId}`,
+            eventId: createEventId(clock, action.nodeId),
             clock,
           },
         ],
@@ -100,7 +105,7 @@ const reducer = (state: State, action: Action) => {
         events: [
           ...cp.nodes[action.sourceNodeId].events,
           {
-            eventId: `${localClock.logical}:${localClock.counter}:${action.sourceNodeId}`,
+            eventId: createEventId(localClock, action.sourceNodeId),
             clock: localClock,
           },
         ],
@@ -113,7 +118,7 @@ const reducer = (state: State, action: Action) => {
         events: [
           ...cp.nodes[action.destinationNodeId].events,
           {
-            eventId: `${remoteClock.logical}:${remoteClock.counter}:${action.destinationNodeId}`,
+            eventId: createEventId(remoteClock, action.destinationNodeId),
             clock: remoteClock,
           },
         ],
@@ -153,16 +158,6 @@ export const App = () => {
         ))}
       </div>
       <div>
-        <div css={{ marginBottom: 16 }}>
-          <div style={{ fontStyle: "italic", maxWidth: 400 }}>
-            l.j is introduced as a level of indirection to maintain the maximum
-            of pt information learned so far, and c is used for capturing
-            causality updates only when l values are equal [...] we can reset c
-            when the information heard about maximum pt catches up or goes ahead
-            of l.
-          </div>
-        </div>
-
         {([] as IEvent[])
           .concat(
             ...Object.keys(state.nodes).map(
