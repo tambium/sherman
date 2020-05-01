@@ -4,11 +4,11 @@ import { v4 as uuidv4 } from "uuid";
 import { Node } from "./components/node";
 import { GlobalStyle } from "./components/global-style";
 
-export interface ITodo {
-  id: string;
-  text: string;
-  tombstone: number;
-}
+// export interface ITodo {
+//   id: string;
+//   text: string;
+//   tombstone: number;
+// }
 
 const NODE_COUNT = 3;
 
@@ -17,8 +17,11 @@ const initialNodes = new Array(NODE_COUNT).fill(null).map(() => ({
 }));
 
 export const App = () => {
-  const [todos, setTodos] = React.useState<ITodo[]>([]);
   const [nodes, setNodes] = React.useState(initialNodes);
+
+  const handleSync = ({ messages }) => {
+    console.log("target", messages);
+  };
 
   return (
     <React.Fragment>
@@ -30,12 +33,11 @@ export const App = () => {
         }}
       >
         {nodes.map((node) => (
-          <Node key={node.nodeId} nodeId={node.nodeId} />
-        ))}
-      </div>
-      <div>
-        {todos.map((todo) => (
-          <div key={todo.id}>{todo.id}</div>
+          <Node
+            key={node.nodeId}
+            nodeId={node.nodeId}
+            handleSync={handleSync}
+          />
         ))}
       </div>
     </React.Fragment>
