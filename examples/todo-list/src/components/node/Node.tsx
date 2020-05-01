@@ -1,61 +1,19 @@
 import React from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Clock, initialize, send } from "../../../../../packages/clock";
+import { ILocalDB, IMessage, IRow } from "../../types";
 
 interface NodeProps {
-  handleSync: (option: any) => void;
+  handleSync: (options?: { messages?: IMessage[] }) => void;
   nodeId: string;
 }
 
-interface IData {
-  [key: string]: Array<any>;
-}
-
-interface IDB {
-  messages: IMessage[];
-  data: IData;
-}
-
 type Inputs = {
-  title: "";
+  title: string;
 };
 
-interface IMessage {
-  [key: string]: any;
-}
-
-interface IRow {
-  [key: string]: any;
-}
-
-/**
- *
- * Call addTodo
- * Check inputs.title not empty
- * If not empty, call generateMessages(clock, table, row);
- *                    generateMessages(clock, "todos", { title: inputs.title });
- * Return array (messages) of database cells by mapping over keys in row
- *      { column: key, dataset: table, row: row.id || uuid, timestamp: Clock.send(), value: row[key] }
- * Call applyMessages(messages)
- *      existingMessages = compareMessages(messages)
- *          creates new Map (existingMessages)
- *          sorts localDB.messages by timestamp in reverse order (newest first)
- *          for each message, find first (newest) where == table, row and column
- *          existingMessages.set(message, newestExisting || null)
- *          returns existingMessages
- *      for each existing message
- *      existingMessage = existingMessages.get(message)
- *      if !existingMessage OR existingMessage.timestamp < message.timestamp i.e. message is newer
- *          apply(message)
- *              find message row in table by id in localDB.data.todos
- *              if row does not exist, create it
- *              if row does exist, replace row in table
- *
- *
- */
-
 const initialInputValues: Inputs = {
-  title: "",
+  title: "init",
 };
 
 const generateMessages = (clock: Clock, table: string, row: IRow) => {
@@ -64,7 +22,7 @@ const generateMessages = (clock: Clock, table: string, row: IRow) => {
 
   return fields.map((key) => ({
     column: key,
-    dataset: table,
+    table,
     row: row.id || id,
     timestamp: send({ localClock: clock, now: Date.now() }),
     value: row[key],
@@ -72,10 +30,11 @@ const generateMessages = (clock: Clock, table: string, row: IRow) => {
 };
 
 export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
+  const isMounted = React.useRef(false);
   const [isOnline, setOnline] = React.useState(true);
-  const [localDB, setLocalDB] = React.useState<IDB>({
+  const [localDB, setLocalDB] = React.useState<ILocalDB>({
     messages: [],
-    data: {
+    tables: {
       todos: [],
     },
   });
@@ -87,6 +46,14 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     })
   );
 
+  React.useEffect(() => {
+    if (isMounted.current && isOnline) {
+      handleSync();
+    } else {
+      isMounted.current = true;
+    }
+  }, [isOnline]);
+
   const handleInputChange = (e: React.ChangeEvent<any>) => {
     setInputs({
       ...inputs,
@@ -96,18 +63,20 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
 
   const compareMessages = (messages: IMessage[]) => {
     let existingMessages = new Map();
+    /**
+     * positive: second sorted before first
+     * negative: first sorted before second
+     * zero: no changes are made to sort order
+     */
     let sortedMessages = [...localDB.messages].sort((first, second) => {
-      // If the result is positive second is sorted before first.
       if (first.timestamp < second.timestamp) return 1;
-      // If the result is negative first is sorted before second.
       else if (first.timestamp > second.timestamp) return -1;
-      // If the result is 0 no changes are done with the sort order of the two values.
       return 0;
     });
     messages.forEach((message) => {
       let existingMessage = sortedMessages.find(
         (instance) =>
-          message.dataset === instance.dataset &&
+          message.table === instance.table &&
           message.row === instance.row &&
           message.column === instance.column
       );
@@ -118,8 +87,8 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
   };
 
   const apply = (message: IMessage) => {
-    const table = localDB.data[message.dataset];
-    if (!table) throw new Error(`Table \`${message.dataset}\` does not exist.`);
+    const table = localDB.tables[message.table];
+    if (!table) throw new Error(`Table \`${message.table}\` does not exist.`);
 
     const row = table.find((row) => row.id === message.row);
 
@@ -131,9 +100,9 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
       });
       setLocalDB((prevState) => ({
         ...prevState,
-        data: {
-          ...prevState.data,
-          [message.dataset]: updated,
+        tables: {
+          ...prevState.tables,
+          [message.table]: updated,
         },
       }));
     } else {
@@ -141,9 +110,9 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
       updated[message.column] = message.value;
       setLocalDB((prevState) => ({
         ...prevState,
-        data: {
-          ...prevState.data,
-          [message.dataset]: updated,
+        tables: {
+          ...prevState.tables,
+          [message.table]: updated,
         },
       }));
     }
@@ -204,7 +173,12 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
         <label css={{ fontWeight: 600 }} htmlFor="online">
           isOnline:
         </label>
-        <input checked name="online" readOnly type="checkbox" />
+        <input
+          checked={isOnline}
+          name="online"
+          onChange={() => setOnline((prevState) => !prevState)}
+          type="checkbox"
+        />
       </div>
       <div css={{ alignItems: "center", display: "flex", marginBottom: 8 }}>
         <label css={{ fontWeight: 600 }} htmlFor="logical">
@@ -224,7 +198,7 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
         />
         <button onClick={addTodo}>Add</button>
       </div>
-      {!!localDB.data.todos.length && (
+      {!!localDB.tables.todos.length && (
         <div
           style={{
             border: "2px solid #C0C8D2",
@@ -235,7 +209,7 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
             padding: 12,
           }}
         >
-          {localDB.data.todos.map((todo) => {
+          {localDB.tables.todos.map((todo) => {
             return <div key={todo.id}>{todo.title}</div>;
           })}
         </div>

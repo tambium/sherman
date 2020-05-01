@@ -1,6 +1,6 @@
 # Todo list
 
-This example models a set of local nodes that can independently add todo list items. If a note `isOnline: bool` we expect it to share updates of its todo list with a central authority for syncing.
+This example models a set of local nodes that can independently add todo list items. If a note `isOnline: bool` we expect it to share updates of its `localDB` with a central authority `hostedDB` for syncing across nodes.
 
 ### Running the example
 
