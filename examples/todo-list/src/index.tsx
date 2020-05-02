@@ -19,8 +19,8 @@ const initialNodes = new Array(NODE_COUNT).fill(null).map(() => ({
 
 export const App = () => {
   const [hostedDB, setHostedDB] = React.useState<IHostedDB>({ messages: [] });
-
   const [nodes, setNodes] = React.useState(initialNodes);
+
   const sync = (options?: { messages?: IMessage[] }) => {
     const messages = options?.messages || [];
     const updated = [...hostedDB.messages, ...(messages || [])];
@@ -54,7 +54,6 @@ export const App = () => {
           {hostedDB.messages
             .filter((el) => el.table === "todos")
             .map((todo) => {
-              console.log(todo);
               return <div key={todo.row}>{todo.value}</div>;
             })}
         </div>
