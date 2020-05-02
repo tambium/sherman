@@ -31,7 +31,6 @@ export const Node: React.FC<NodeProps> = ({
         {nodeIds
           .filter((nodeId) => nodeId !== node.nodeId)
           .map((destinationNodeId) => {
-            console.log(destinationNodeId);
             return (
               <button
                 css={{ marginBottom: 4 }}
