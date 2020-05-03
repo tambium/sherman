@@ -1,10 +1,10 @@
 import React from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Clock, initialize, send } from "../../../../../packages/clock";
-import { ILocalDB, IMessage, IRow } from "../../types";
+import { Clock, initialize, send } from "../../../../../packages/sherman-clock";
+import { ILocalDB, IMessage, IRow, ISyncOptions } from "../../types";
 
 interface NodeProps {
-  handleSync: (options?: { messages?: IMessage[] }) => void;
+  handleSync: (options?: ISyncOptions) => void;
   nodeId: string;
 }
 
@@ -141,15 +141,24 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
   const sync = (initialMessages: IMessage[] = []) => {
     if (!isOnline) return;
     let messages = initialMessages;
-    const result = handleSync({ messages });
+    let result;
+    // mocking server call...
+    result = handleSync({
+      clientId: clock.nodeId,
+      groupId: "default",
+      messages,
+    });
+  };
+
+  const sendMessages = (messages: IMessage[]) => {
+    applyMessages(messages);
+    sync(messages);
   };
 
   const addTodo = () => {
     if (inputs.title === "") return;
     const messages = generateMessages(clock, "todos", { title: inputs.title });
-    applyMessages(messages);
-    sync(messages);
-    // TODO: sync messages sync(messages);
+    sendMessages(messages);
   };
 
   return (

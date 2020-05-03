@@ -1,0 +1,14 @@
+{
+  "name": "@tambium/sherman-merkle",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "src/index.ts",
+  "license": "MIT",
+  "scripts": {
+    "build": "rm -rf dist && tsc -p ./tsconfig.json"
+  },
+  "dependencies": {
+    "@tambium/sherman-clock": "1.0.0"
+  }
+}

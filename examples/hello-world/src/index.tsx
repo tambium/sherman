@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import { Clock, receive, send } from "../../../packages/clock";
+import { Clock, receive, send } from "../../../packages/sherman-clock";
 import { INode, Node } from "./components/node";
 import { Event, IEvent } from "./components/event";
 import { GlobalStyle } from "./components/global-style";

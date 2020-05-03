@@ -1,4 +1,4 @@
-import { Clock } from "../../../../../packages/clock";
+import { Clock } from "../../../../../packages/sherman-clock";
 
 export const createEventId = (clock: Clock, nodeId: string): string => {
   const pad = (initialValue: number, targetLength: number): string => {

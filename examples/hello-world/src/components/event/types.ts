@@ -1,4 +1,4 @@
-import { Clock } from "~../../../packages/clock/dist";
+import { Clock } from "../../../../../packages/sherman-clock";
 
 export interface IEvent {
   eventId: string;

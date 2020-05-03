@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "paths": {
-      "@tambium/clock": ["./packages/clock/src"]
+      "@tambium/sherman-clock": ["./packages/sherman-clock/src"],
+      "@tambium/sherman-merkle": ["./packages/sherman-merkle/src"]
     }
   }
 }
