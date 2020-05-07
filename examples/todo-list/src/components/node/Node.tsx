@@ -8,7 +8,15 @@ import {
   unpack,
 } from "../../../../../packages/sherman-clock";
 import { insert } from "../../../../../packages/sherman-merkle";
-import { ILocalDB, IMessage, IRow, ISyncOptions } from "../../types";
+import { ILocalDB, IMessage, IRow, ISyncOptions, ITodo } from "../../types";
+import {
+  hasItem,
+  getLocalDB,
+  setter,
+  constructLocalDB,
+} from "../../utils/localStorage";
+import { isEmpty } from "../../utils/objects";
+import { LOCAL_MESSAGES, LOCAL_TABLES, LOCAL_TODOS } from "../../constants";
 
 interface NodeProps {
   handleSync: (options?: ISyncOptions) => void;
@@ -41,22 +49,29 @@ const generateMessages = (
 };
 
 export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
+  React.useEffect(() => {
+    if (isEmpty(getLocalDB(nodeId))) {
+      const base = {
+        [LOCAL_MESSAGES]: [],
+        [LOCAL_TABLES]: {
+          [LOCAL_TODOS]: [],
+        },
+      };
+      setter(constructLocalDB(nodeId), base);
+    }
+  }, []);
+
   const isMounted = React.useRef(false);
-  const [isOnline, setOnline] = React.useState(true);
-  const [localDB, setLocalDB] = React.useState<ILocalDB>({
-    messages: [],
-    tables: {
-      todos: [],
-    },
-  });
-  const [inputs, setInputs] = React.useState(initialInputValues);
-  const [node, setNode] = React.useState({
+  const node = React.useRef({
     clock: initialize({
       nodeId,
       now: Date.now(),
     }),
     merkle: {},
   });
+
+  const [isOnline, setOnline] = React.useState(true);
+  const [inputs, setInputs] = React.useState(initialInputValues);
 
   React.useEffect(() => {
     if (isMounted.current && isOnline) {
@@ -80,7 +95,10 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
      * negative: first sorted before second
      * zero: no changes are made to sort order
      */
-    let sortedMessages = [...localDB.messages].sort((first, second) => {
+    const localDB = getLocalDB(nodeId);
+    const localMessages = localDB[LOCAL_MESSAGES];
+
+    let sortedMessages = [...localMessages].sort((first, second) => {
       if (first.timestamp < second.timestamp) return 1;
       else if (first.timestamp > second.timestamp) return -1;
       return 0;
@@ -99,34 +117,44 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
   };
 
   const apply = (message: IMessage) => {
-    const table = localDB.tables[message.table];
+    const localDB = getLocalDB(nodeId);
+    const table = localDB[LOCAL_TABLES][message.table];
+
     if (!table) throw new Error(`Table \`${message.table}\` does not exist.`);
 
-    const row = table.find((row) => row.id === message.row);
+    const row = table.find((row: IRow) => row.id === message.row);
 
     if (!row) {
+      const localDB = getLocalDB(nodeId);
+      const localTables = localDB[LOCAL_TABLES];
+
       const updated = [...table];
       updated.push({
         id: message.row,
         [message.column]: message.value,
       });
-      setLocalDB((prevState) => ({
-        ...prevState,
-        tables: {
-          ...prevState.tables,
+
+      setter(constructLocalDB(nodeId), {
+        ...localDB,
+        [LOCAL_TABLES]: {
+          ...localTables,
           [message.table]: updated,
         },
-      }));
+      });
     } else {
+      const localDB = getLocalDB(nodeId);
+      const localTables = localDB[LOCAL_TABLES];
+
       const updated = [...table];
       updated[message.column] = message.value;
-      setLocalDB((prevState) => ({
-        ...prevState,
-        tables: {
-          ...prevState.tables,
+
+      setter(constructLocalDB(nodeId), {
+        ...localDB,
+        [LOCAL_TABLES]: {
+          ...localTables,
           [message.table]: updated,
         },
-      }));
+      });
     }
   };
 
@@ -139,43 +167,34 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
       }
 
       if (!existingMessage || existingMessage.timestamp !== message.timestamp) {
-        setNode((prevState) => ({
-          ...prevState,
+        node.current = {
+          ...node.current,
           merkle: insert({
             clock: unpack(message.timestamp),
-            trie: prevState.merkle,
+            trie: node.current.merkle,
           }),
-        }));
-        setLocalDB((prevState) => ({
-          ...prevState,
-          messages: [...prevState.messages, message],
-        }));
+        };
+
+        const localDB = getLocalDB(nodeId);
+        const localMessages = localDB[LOCAL_MESSAGES];
+        setter(constructLocalDB(nodeId), {
+          ...localDB,
+          [LOCAL_MESSAGES]: [...localMessages, message],
+        });
       }
     });
-
-    // TODO: handle sync (onSync) -- may just be re-render?
   };
 
   const sync = (initialMessages: IMessage[] = []) => {
     if (!isOnline) return;
     let messages = initialMessages;
-    let result;
-
-    // console.log(node);
-
-    result = handleSync({
-      clientId: node.clock.nodeId,
+    const result = handleSync({
+      clientId: node.current.clock.nodeId,
       groupId: "default",
       messages,
-      merkle: node.merkle,
+      merkle: node.current.merkle,
     });
-
-    // console.log(result);
   };
-
-  React.useEffect(() => {
-    console.log("hello world");
-  }, [applyMessages]);
 
   const sendMessages = (messages: IMessage[]) => {
     applyMessages(messages);
@@ -184,11 +203,35 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
 
   const addTodo = () => {
     if (inputs.title === "") return;
-    const messages = generateMessages(node.clock, "todos", {
+    const messages = generateMessages(node.current.clock, LOCAL_TODOS, {
       title: inputs.title,
     });
     sendMessages(messages);
   };
+
+  /**
+   *
+   * submit todo
+   * generate array of `messages` from each `row`
+   *    {column: "title", row: "0695755e-c240-45b2-9b40-8b86f18baad4", table: "todos", timestamp: ...}]
+   *
+   * apply the new messages
+   *    sort existing messages
+   *    for each new message, check if any existing message shares `table`, `row` and `column` fields
+   *
+   *    if no existing message OR existing message timestamp before new message timestamp
+   *        `apply` the message
+   *            either add the message to `localDB` table state or update existing message in `localDb` table state
+   *
+   *    if no existing message OR existing message timestamp DOES NOT EQUAL new message timestamp (near enough all cases...)
+   *        update the `merkle` associated with the `node` in state [?]
+   *        set the `messages` in `localDB` state [?]
+   *
+   *
+   *
+   */
+
+  const localDB = getLocalDB(nodeId);
 
   return (
     <div
@@ -222,7 +265,7 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
         <label css={{ fontWeight: 600 }} htmlFor="logical">
           logical:
         </label>
-        <input name="logical" readOnly value={node.clock.logical} />
+        <input name="logical" readOnly value={node.current.clock.logical} />
       </div>
       <div>
         <label css={{ fontWeight: 600 }} htmlFor="addTodo">
@@ -236,22 +279,25 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
         />
         <button onClick={addTodo}>Add</button>
       </div>
-      {!!localDB.tables.todos.length && (
-        <div
-          style={{
-            border: "2px solid #C0C8D2",
-            borderRadius: 4,
-            display: "flex",
-            flexDirection: "column",
-            marginTop: 8,
-            padding: 12,
-          }}
-        >
-          {localDB.tables.todos.map((todo) => {
-            return <div key={todo.id}>{todo.title}</div>;
-          })}
-        </div>
-      )}
+      {localDB &&
+        localDB[LOCAL_TABLES] &&
+        localDB[LOCAL_TABLES][LOCAL_TODOS] &&
+        !!localDB[LOCAL_TABLES][LOCAL_TODOS].length && (
+          <div
+            style={{
+              border: "2px solid #C0C8D2",
+              borderRadius: 4,
+              display: "flex",
+              flexDirection: "column",
+              marginTop: 8,
+              padding: 12,
+            }}
+          >
+            {localDB[LOCAL_TABLES][LOCAL_TODOS].map((todo: ITodo) => {
+              return <div key={todo.id}>{todo.title}</div>;
+            })}
+          </div>
+        )}
     </div>
   );
 };
