@@ -1,6 +1,13 @@
 import React from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Clock, initialize, send } from "../../../../../packages/sherman-clock";
+import {
+  Clock,
+  initialize,
+  pack,
+  send,
+  unpack,
+} from "../../../../../packages/sherman-clock";
+import { insert } from "../../../../../packages/sherman-merkle";
 import { ILocalDB, IMessage, IRow, ISyncOptions } from "../../types";
 
 interface NodeProps {
@@ -16,7 +23,11 @@ const initialInputValues: Inputs = {
   title: "init",
 };
 
-const generateMessages = (clock: Clock, table: string, row: IRow) => {
+const generateMessages = (
+  clock: Clock,
+  table: string,
+  row: IRow
+): IMessage[] => {
   const id = uuidv4();
   const fields = Object.keys(row);
 
@@ -24,7 +35,7 @@ const generateMessages = (clock: Clock, table: string, row: IRow) => {
     column: key,
     table,
     row: row.id || id,
-    timestamp: send({ localClock: clock, now: Date.now() }),
+    timestamp: pack(send({ localClock: clock, now: Date.now() })),
     value: row[key],
   }));
 };
@@ -39,12 +50,13 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     },
   });
   const [inputs, setInputs] = React.useState(initialInputValues);
-  const [clock, setClock] = React.useState(
-    initialize({
+  const [node, setNode] = React.useState({
+    clock: initialize({
       nodeId,
       now: Date.now(),
-    })
-  );
+    }),
+    merkle: {},
+  });
 
   React.useEffect(() => {
     if (isMounted.current && isOnline) {
@@ -127,7 +139,13 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
       }
 
       if (!existingMessage || existingMessage.timestamp !== message.timestamp) {
-        // TODO: add to merkle
+        setNode((prevState) => ({
+          ...prevState,
+          merkle: insert({
+            clock: unpack(message.timestamp),
+            trie: prevState.merkle,
+          }),
+        }));
         setLocalDB((prevState) => ({
           ...prevState,
           messages: [...prevState.messages, message],
@@ -142,13 +160,22 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     if (!isOnline) return;
     let messages = initialMessages;
     let result;
-    // mocking server call...
+
+    // console.log(node);
+
     result = handleSync({
-      clientId: clock.nodeId,
+      clientId: node.clock.nodeId,
       groupId: "default",
       messages,
+      merkle: node.merkle,
     });
+
+    // console.log(result);
   };
+
+  React.useEffect(() => {
+    console.log("hello world");
+  }, [applyMessages]);
 
   const sendMessages = (messages: IMessage[]) => {
     applyMessages(messages);
@@ -157,7 +184,9 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
 
   const addTodo = () => {
     if (inputs.title === "") return;
-    const messages = generateMessages(clock, "todos", { title: inputs.title });
+    const messages = generateMessages(node.clock, "todos", {
+      title: inputs.title,
+    });
     sendMessages(messages);
   };
 
@@ -193,7 +222,7 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
         <label css={{ fontWeight: 600 }} htmlFor="logical">
           logical:
         </label>
-        <input name="logical" readOnly value={clock.logical} />
+        <input name="logical" readOnly value={node.clock.logical} />
       </div>
       <div>
         <label css={{ fontWeight: 600 }} htmlFor="addTodo">

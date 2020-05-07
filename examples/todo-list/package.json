@@ -4,7 +4,7 @@
   "main": "src/index.tsx",
   "license": "MIT",
   "scripts": {
-    "start": "parcel index.html"
+    "start": "parcel index.html --no-cache"
   },
   "dependencies": {
     "@emotion/babel-preset-css-prop": "^10.0.27",

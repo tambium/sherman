@@ -1,11 +1,10 @@
-import { Clock } from "../../../../packages/sherman-clock";
+import { IMerkle } from "../../../../packages/sherman-merkle";
 
 export interface IMessage {
   column: string;
-  groupId: string;
   table: string;
   row: string;
-  timestamp: Clock;
+  timestamp: string;
   value: string;
 }
 
@@ -19,18 +18,14 @@ export interface ITodo {
   tombstone?: number;
 }
 
-export interface IMerkle {
-  hash: number;
-}
-
-export interface IMessageMerkle {
+export interface IMerkleEntity {
   groupId: string;
   merkle: string;
 }
 
 export interface IHostedDB {
   messages: IMessage[];
-  messagesMerkles: IMessageMerkle[];
+  messagesMerkles: IMerkleEntity[];
 }
 
 export interface ILocalDB {
@@ -44,6 +39,6 @@ export interface ILocalDB {
 export interface ISyncOptions {
   clientId: string;
   groupId: string;
-  merkle: string;
+  merkle: IMerkle;
   messages: IMessage[];
 }

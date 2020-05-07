@@ -14,10 +14,15 @@ export const pack = ({ counter, logical, nodeId }: Clock): string => {
   }): string => {
     const stringified =
       typeof original === "number" ? original.toString(16) : original;
-    return stringified.padStart(length, fillString).slice(length);
+    return stringified
+      .padStart(length, fillString)
+      .slice(length - stringified.length);
   };
 
-  return `${ISO}-${uniform({ length: 4, original: counter })}-${uniform({
+  return `${ISO}/${uniform({
+    length: 4,
+    original: counter,
+  })}/${uniform({
     length: 16,
     original: nodeId,
   })}`;

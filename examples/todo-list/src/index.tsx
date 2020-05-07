@@ -1,15 +1,16 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import { v4 as uuidv4 } from "uuid";
-import { pack } from "../../../packages/sherman-clock";
+import { pack, initialize, unpack } from "../../../packages/sherman-clock";
+import { difference, IMerkle, insert } from "../../../packages/sherman-merkle";
 import { Node } from "./components/node";
 import { GlobalStyle } from "./components/global-style";
-import { IHostedDB, IMessage, ISyncOptions, IMerkle } from "./types";
+import { IHostedDB, IMessage, ISyncOptions, IMerkleEntity } from "./types";
 
 const NODE_COUNT = 3;
 
 const initialNodes = new Array(NODE_COUNT).fill(null).map(() => ({
-  nodeId: uuidv4(),
+  nodeId: uuidv4().replace(/-/g, ""),
 }));
 
 /**
@@ -31,22 +32,19 @@ export const App = () => {
   });
   const [nodes, setNodes] = React.useState(initialNodes);
 
-  const getMerkle = (groupId: string): string => {
-    const rows = hostedDB.messagesMerkles.filter(
+  const getMerkle = (groupId: string): IMerkle | {} => {
+    const rows: IMerkleEntity[] = hostedDB.messagesMerkles.filter(
       (merkle) => merkle.groupId === groupId
     );
-    return rows.length ? rows[0].merkle : "";
+    return rows.length ? JSON.parse(rows[0].merkle) : {};
   };
 
-  const addMessages = (groupId: string, messages: IMessage[]) => {
-    const trie = getMerkle(groupId);
+  const addMessages = (groupId: string, messages: IMessage[]): IMerkle => {
+    let trie: IMerkle = getMerkle(groupId);
     for (let message of messages) {
-      const { column, groupId, table, row, timestamp, value } = message;
-      let res;
+      const { column, table, row, timestamp, value } = message;
       const check = hostedDB.messages.findIndex(
-        (msg) =>
-          `${msg.groupId}:${pack(msg.timestamp)}` ===
-          `${groupId}:${pack(timestamp)}`
+        (msg) => `${groupId}:${msg.timestamp}` === `${groupId}:${timestamp}`
       );
 
       if (check === -1) {
@@ -54,10 +52,17 @@ export const App = () => {
           ...prevState,
           messages: [...prevState.messages, message],
         }));
-        // TODO...
+        trie = insert({ clock: unpack(timestamp), trie });
       }
-      // PRIMARY KEY(timestamp, groupId));
+      setHostedDB((prevState) => ({
+        ...prevState,
+        messagesMerkles: [
+          ...prevState.messagesMerkles,
+          { groupId, merkle: JSON.stringify(trie) },
+        ],
+      }));
     }
+    return trie;
   };
 
   const sync = (options: ISyncOptions) => {
@@ -69,6 +74,23 @@ export const App = () => {
       ...prevState,
       messages: updated,
     }));
+
+    let newMessages: IMessage[] = [];
+    if (options.merkle) {
+      let diffTime = difference(trie, options.merkle);
+      if (diffTime) {
+        let timestamp = initialize({ nodeId: options.clientId, now: diffTime });
+        newMessages = hostedDB.messages.filter(
+          (message) =>
+            message.timestamp > pack(timestamp) &&
+            timestamp.nodeId !== options.clientId
+        );
+      }
+    }
+    return {
+      messages: newMessages,
+      merkle: trie,
+    };
   };
 
   return (
