@@ -1,16 +1,19 @@
 {
-  "name": "@tambium/clock",
+  "name": "@tambium/sherman-clock",
   "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "src/index.ts",
   "license": "MIT",
   "scripts": {
-    "build": "rm -rf dist && tsc -p ./tsconfig.json",
-    "start": "parcel index.html"
+    "build": "rm -rf dist && tsc -p ./tsconfig.json"
   },
   "devDependencies": {
     "@babel/core": "^7.0.0",
+    "@types/murmurhash": "^0.0.1",
     "typescript": "^3.8.3"
+  },
+  "dependencies": {
+    "murmurhash": "^1.0.0"
   }
 }

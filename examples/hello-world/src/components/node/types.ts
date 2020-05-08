@@ -1,5 +1,5 @@
-import { Clock } from "~../../../packages/clock/dist";
-import { IEvent } from "~components/event";
+import { Clock } from "../../../../../packages/sherman-clock";
+import { IEvent } from "../../components/event";
 
 export interface INode {
   clock: Clock;

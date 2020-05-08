@@ -1,4 +1,4 @@
-import { initialize } from "../../../../../packages/clock";
+import { initialize } from "../../../../../packages/sherman-clock";
 import { INode } from "../../components/node";
 import { createEventId } from "../../utils/event";
 
