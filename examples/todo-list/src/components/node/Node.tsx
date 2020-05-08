@@ -8,13 +8,8 @@ import {
   unpack,
 } from "../../../../../packages/sherman-clock";
 import { insert } from "../../../../../packages/sherman-merkle";
-import { ILocalDB, IMessage, IRow, ISyncOptions, ITodo } from "../../types";
-import {
-  hasItem,
-  getLocalDB,
-  setter,
-  constructLocalDB,
-} from "../../utils/localStorage";
+import { IMessage, IRow, ISyncOptions, ITodo } from "../../types";
+import { getLocalDB, setter, constructLocalDB } from "../../utils/localStorage";
 import { isEmpty } from "../../utils/objects";
 import { LOCAL_MESSAGES, LOCAL_TABLES, LOCAL_TODOS } from "../../constants";
 
@@ -208,28 +203,6 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     });
     sendMessages(messages);
   };
-
-  /**
-   *
-   * submit todo
-   * generate array of `messages` from each `row`
-   *    {column: "title", row: "0695755e-c240-45b2-9b40-8b86f18baad4", table: "todos", timestamp: ...}]
-   *
-   * apply the new messages
-   *    sort existing messages
-   *    for each new message, check if any existing message shares `table`, `row` and `column` fields
-   *
-   *    if no existing message OR existing message timestamp before new message timestamp
-   *        `apply` the message
-   *            either add the message to `localDB` table state or update existing message in `localDb` table state
-   *
-   *    if no existing message OR existing message timestamp DOES NOT EQUAL new message timestamp (near enough all cases...)
-   *        update the `merkle` associated with the `node` in state [?]
-   *        set the `messages` in `localDB` state [?]
-   *
-   *
-   *
-   */
 
   const localDB = getLocalDB(nodeId);
 

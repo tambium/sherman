@@ -5,7 +5,7 @@ import { pack, initialize, unpack } from "../../../packages/sherman-clock";
 import { difference, IMerkle, insert } from "../../../packages/sherman-merkle";
 import { Node } from "./components/node";
 import { GlobalStyle } from "./components/global-style";
-import { IHostedDB, IMessage, ISyncOptions, IMerkleEntity } from "./types";
+import { IMessage, ISyncOptions, IMerkleEntity } from "./types";
 import {
   setter,
   getter,
@@ -25,18 +25,6 @@ const TODO_NAMESPACE = "d697ecc7-6bd7-49f9-a954-c52faba4ff9b";
 const initialNodes = new Array(NODE_COUNT).fill(null).map((_, idx) => ({
   nodeId: uuidv5(String(idx), TODO_NAMESPACE).replace(/-/g, ""),
 }));
-
-/**
- * sync
- *    called in backgroundSync
- *        uses setInterval to call sync every 4000ms
- *        called on initialization
- *        called when toggled back online
- *    called when sync button pressed
- *    called in sendMessages
- *        called in insert, update and delete
- *    called within itself if diffTime
- */
 
 export const App = () => {
   React.useEffect(() => {
