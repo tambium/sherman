@@ -6,12 +6,7 @@ import { difference, IMerkle, insert } from "../../../packages/sherman-merkle";
 import { Node } from "./components/node";
 import { GlobalStyle } from "./components/global-style";
 import { IMessage, ISyncOptions, IMerkleEntity } from "./types";
-import {
-  setter,
-  getter,
-  getHostedMessages,
-  hasItem,
-} from "./utils/localStorage";
+import { setter, getter, hasItem } from "./utils/localStorage";
 import {
   HOSTED_DB,
   HOSTED_MESSAGES,
@@ -26,18 +21,51 @@ const initialNodes = new Array(NODE_COUNT).fill(null).map((_, idx) => ({
   nodeId: uuidv5(String(idx), TODO_NAMESPACE).replace(/-/g, ""),
 }));
 
+interface IHostedDB {
+  [HOSTED_MESSAGES]: IMessage[];
+  [HOSTED_MESSAGES_MERKLES]: IMerkle[];
+}
+
+const initialState = {
+  [HOSTED_MESSAGES]: [],
+  [HOSTED_MESSAGES_MERKLES]: [],
+};
+
+/**
+ * We use state as a layer of abstraction over
+ * localStorage through extendedSetter for
+ * rendering. localStorage remains the source
+ * of truth for comparisons on sync.
+ */
+
 export const App = () => {
+  const [state, setState] = React.useState<IHostedDB>(initialState);
+  const [nodes] = React.useState(initialNodes);
+
+  const extendedSetter = ({
+    setterProps,
+  }: {
+    setterProps: {
+      item: string;
+      obj: {
+        [HOSTED_MESSAGES]: IMessage[];
+        [HOSTED_MESSAGES_MERKLES]: IMerkle[];
+      };
+    };
+  }) => {
+    setState(setterProps.obj);
+    return setter(setterProps.item, setterProps.obj);
+  };
+
   React.useEffect(() => {
     if (!hasItem(HOSTED_DB)) {
       const base = {
         [HOSTED_MESSAGES]: [],
         [HOSTED_MESSAGES_MERKLES]: [],
       };
-      setter(HOSTED_DB, base);
+      extendedSetter({ setterProps: { item: HOSTED_DB, obj: base } });
     }
   }, []);
-
-  const [nodes] = React.useState(initialNodes);
 
   const getMerkle = (groupId: string): IMerkle | {} => {
     const messagesMerkles: IMerkleEntity[] = getter(HOSTED_DB)[
@@ -64,19 +92,29 @@ export const App = () => {
       );
 
       if (check === -1) {
-        setter(HOSTED_DB, {
-          ...hostedDB,
-          [HOSTED_MESSAGES]: [...hostedDBMessages, message],
+        extendedSetter({
+          setterProps: {
+            item: HOSTED_DB,
+            obj: {
+              ...hostedDB,
+              [HOSTED_MESSAGES]: [...hostedDBMessages, message],
+            },
+          },
         });
         trie = insert({ clock: unpack(timestamp), trie });
       }
 
-      setter(HOSTED_DB, {
-        ...hostedDB,
-        [HOSTED_MESSAGES_MERKLES]: [
-          ...hostedDBMessagesMerkles,
-          { groupId, merkle: JSON.stringify(trie) },
-        ],
+      extendedSetter({
+        setterProps: {
+          item: HOSTED_DB,
+          obj: {
+            ...hostedDB,
+            [HOSTED_MESSAGES_MERKLES]: [
+              ...hostedDBMessagesMerkles,
+              { groupId, merkle: JSON.stringify(trie) },
+            ],
+          },
+        },
       });
     }
     return trie;
@@ -89,9 +127,14 @@ export const App = () => {
     const hostedDB = getter(HOSTED_DB);
     const hostedDBMessages: IMessage[] = hostedDB[HOSTED_MESSAGES];
 
-    setter(HOSTED_DB, {
-      ...hostedDB,
-      [HOSTED_MESSAGES]: [...hostedDBMessages, ...(messages || [])],
+    extendedSetter({
+      setterProps: {
+        item: HOSTED_DB,
+        obj: {
+          ...hostedDB,
+          [HOSTED_MESSAGES]: [...hostedDBMessages, ...(messages || [])],
+        },
+      },
     });
 
     let newMessages: IMessage[] = [];
@@ -115,7 +158,11 @@ export const App = () => {
     };
   };
 
-  const messages = getHostedMessages();
+  const clearStorage = () => {
+    localStorage.clear();
+    setState(initialState);
+    location.reload();
+  };
 
   return (
     <div
@@ -126,13 +173,12 @@ export const App = () => {
       }}
     >
       <div css={{ display: "flex" }}>
-        <button onClick={() => localStorage.clear()}>Clear LS</button>
-        <button onClick={() => location.reload()}>Reload</button>
+        <button onClick={clearStorage}>Clear</button>
       </div>
       {nodes.map((node) => (
         <Node key={node.nodeId} nodeId={node.nodeId} handleSync={sync} />
       ))}
-      {messages && !!messages.length && (
+      {state && state[HOSTED_MESSAGES] && !!state[HOSTED_MESSAGES].length && (
         <div
           css={{
             border: "2px solid #0670de",
@@ -142,11 +188,11 @@ export const App = () => {
             padding: 12,
           }}
         >
-          {messages
-            .filter((el) => el.table === LOCAL_TODOS)
-            .map((todo) => {
+          {state[HOSTED_MESSAGES].filter((el) => el.table === LOCAL_TODOS).map(
+            (todo) => {
               return <div key={todo.row}>{todo.value}</div>;
-            })}
+            }
+          )}
         </div>
       )}
     </div>

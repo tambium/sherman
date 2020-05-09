@@ -25,11 +25,6 @@ const getHostedDB = () => {
   return getter(HOSTED_DB);
 };
 
-export const getHostedMessages = (): IMessage[] => {
-  const messages: IMessage[] = getHostedDB()[HOSTED_MESSAGES];
-  return messages;
-};
-
 export const constructLocalDB = (nodeId: string): string => {
   return `${LOCAL_DB}${nodeId}`;
 };
