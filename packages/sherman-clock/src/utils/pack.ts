@@ -23,7 +23,7 @@ export const pack = ({ counter, logical, nodeId }: Clock): string => {
     length: 4,
     original: counter,
   })}/${uniform({
-    length: 16,
+    length: 32,
     original: nodeId,
   })}`;
 };
