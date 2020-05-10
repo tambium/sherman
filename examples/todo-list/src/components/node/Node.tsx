@@ -4,17 +4,24 @@ import {
   Clock,
   initialize,
   pack,
+  receive,
   send,
   unpack,
 } from "../../../../../packages/sherman-clock";
 import { insert } from "../../../../../packages/sherman-merkle";
-import { IMessage, IRow, ISyncOptions, ITodo } from "../../types";
+import {
+  IMessage,
+  IRow,
+  ISyncOptions,
+  ISyncResponse,
+  ITodo,
+} from "../../types";
 import { getLocalDB, setter, constructLocalDB } from "../../utils/localStorage";
 import { isEmpty } from "../../utils/objects";
 import { LOCAL_MESSAGES, LOCAL_TABLES, LOCAL_TODOS } from "../../constants";
 
 interface NodeProps {
-  handleSync: (options?: ISyncOptions) => void;
+  handleSync: (options?: ISyncOptions) => ISyncResponse;
   nodeId: string;
 }
 
@@ -55,6 +62,8 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
       setter(constructLocalDB(nodeId), base);
     }
   }, []);
+
+  console.log("ya");
 
   const isMounted = React.useRef(false);
   const node = React.useRef({
@@ -180,15 +189,36 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     });
   };
 
+  const receiveMessages = (messages: IMessage[]) => {
+    messages.forEach((message) => {
+      node.current.clock = receive({
+        localClock: node.current.clock,
+        now: Date.now(),
+        remoteClock: unpack(message.timestamp),
+      });
+    });
+
+    applyMessages(messages);
+  };
+
   const sync = (initialMessages: IMessage[] = []) => {
     if (!isOnline) return;
     let messages = initialMessages;
+
     const result = handleSync({
       clientId: node.current.clock.nodeId,
       groupId: "default",
       messages,
       merkle: node.current.merkle,
     });
+
+    if (result.status !== "ok") {
+      throw new Error(`Error: ${result.reason}`);
+    }
+
+    if (result.data.messages.length > 0) {
+      receiveMessages(result.data.messages);
+    }
   };
 
   const sendMessages = (messages: IMessage[]) => {

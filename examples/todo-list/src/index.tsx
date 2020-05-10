@@ -140,21 +140,27 @@ export const App = () => {
     let newMessages: IMessage[] = [];
     if (options.merkle) {
       let diffTime = difference(trie, options.merkle);
+
       if (diffTime) {
         let timestamp = initialize({ nodeId: options.clientId, now: diffTime });
-
         const msgs: IMessage[] = getter(HOSTED_DB)[HOSTED_MESSAGES];
-        newMessages = msgs.filter(
-          (message) =>
+
+        newMessages = msgs.filter((message) => {
+          return (
             message.timestamp > pack(timestamp) &&
-            timestamp.nodeId !== options.clientId
-        );
+            unpack(message.timestamp).nodeId !== options.clientId
+          );
+        });
       }
     }
 
+    // mock API response
     return {
-      messages: newMessages,
-      merkle: trie,
+      status: "ok",
+      data: {
+        messages: newMessages,
+        merkle: trie,
+      },
     };
   };
 

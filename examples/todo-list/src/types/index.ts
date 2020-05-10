@@ -42,3 +42,16 @@ export interface ISyncOptions {
   merkle: IMerkle;
   messages: IMessage[];
 }
+
+export interface ISyncData {
+  groupId?: string;
+  clientId?: string;
+  messages: IMessage[];
+  merkle: IMerkle;
+}
+
+export interface ISyncResponse {
+  status: string;
+  reason?: string;
+  data: ISyncData;
+}
