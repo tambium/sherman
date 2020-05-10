@@ -71,7 +71,7 @@ export const App = () => {
     const messagesMerkles: IMerkleEntity[] = getter(HOSTED_DB)[
       HOSTED_MESSAGES_MERKLES
     ];
-    const rows: IMerkleEntity[] = messagesMerkles.filter(
+    const rows: IMerkleEntity[] = (messagesMerkles || []).filter(
       (merkle) => merkle.groupId === groupId
     );
     return rows.length ? JSON.parse(rows[0].merkle) : {};
@@ -87,7 +87,7 @@ export const App = () => {
 
     for (let message of messages) {
       const { column, table, row, timestamp, value } = message;
-      const check = hostedDBMessages.findIndex(
+      const check = (hostedDBMessages || []).findIndex(
         (msg) => `${groupId}:${msg.timestamp}` === `${groupId}:${timestamp}`
       );
 
@@ -97,7 +97,7 @@ export const App = () => {
             item: HOSTED_DB,
             obj: {
               ...hostedDB,
-              [HOSTED_MESSAGES]: [...hostedDBMessages, message],
+              [HOSTED_MESSAGES]: [...(hostedDBMessages || []), message],
             },
           },
         });
@@ -110,7 +110,7 @@ export const App = () => {
           obj: {
             ...hostedDB,
             [HOSTED_MESSAGES_MERKLES]: [
-              ...hostedDBMessagesMerkles,
+              ...(hostedDBMessagesMerkles || []),
               { groupId, merkle: JSON.stringify(trie) },
             ],
           },
@@ -132,7 +132,7 @@ export const App = () => {
         item: HOSTED_DB,
         obj: {
           ...hostedDB,
-          [HOSTED_MESSAGES]: [...hostedDBMessages, ...(messages || [])],
+          [HOSTED_MESSAGES]: [...(hostedDBMessages || []), ...(messages || [])],
         },
       },
     });

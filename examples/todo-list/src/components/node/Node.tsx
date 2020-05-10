@@ -61,9 +61,9 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
       };
       setter(constructLocalDB(nodeId), base);
     }
-  }, []);
 
-  console.log("ya");
+    sync();
+  }, []);
 
   const isMounted = React.useRef(false);
   const node = React.useRef({
