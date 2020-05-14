@@ -1,12 +1,18 @@
 import React from "react";
 import ReactDOM from "react-dom";
-import { v5 as uuidv5 } from "uuid";
+import { v4 as uuidv4 } from "uuid";
 import { pack, initialize, unpack } from "../../../packages/sherman-clock";
 import { difference, IMerkle, insert } from "../../../packages/sherman-merkle";
 import { Node } from "./components/node";
 import { GlobalStyle } from "./components/global-style";
-import { IMessage, ISyncOptions, IMerkleEntity } from "./types";
-import { setter, getter, hasItem } from "./utils/localStorage";
+import { IHostedDB, IMessage, ISyncOptions, IMerkleEntity } from "./types";
+import {
+  setter,
+  hasItem,
+  getHostedDB,
+  getHostedDBMessages,
+  getHostedDBMessagesMerkles,
+} from "./utils/localStorage";
 import {
   HOSTED_DB,
   HOSTED_MESSAGES,
@@ -15,16 +21,10 @@ import {
 } from "./constants";
 
 const NODE_COUNT = 3;
-const TODO_NAMESPACE = "d697ecc7-6bd7-49f9-a954-c52faba4ff9b";
 
-const initialNodes = new Array(NODE_COUNT).fill(null).map((_, idx) => ({
-  nodeId: uuidv5(String(idx), TODO_NAMESPACE).replace(/-/g, ""),
+const initialNodes = new Array(NODE_COUNT).fill(null).map(() => ({
+  nodeId: uuidv4().replace(/-/g, ""),
 }));
-
-interface IHostedDB {
-  [HOSTED_MESSAGES]: IMessage[];
-  [HOSTED_MESSAGES_MERKLES]: IMerkle[];
-}
 
 const initialState = {
   [HOSTED_MESSAGES]: [],
@@ -59,20 +59,15 @@ export const App = () => {
 
   React.useEffect(() => {
     if (!hasItem(HOSTED_DB)) {
-      const base = {
-        [HOSTED_MESSAGES]: [],
-        [HOSTED_MESSAGES_MERKLES]: [],
-      };
-      extendedSetter({ setterProps: { item: HOSTED_DB, obj: base } });
+      extendedSetter({ setterProps: { item: HOSTED_DB, obj: initialState } });
     }
   }, []);
 
   const getMerkle = (groupId: string): IMerkle | {} => {
-    const messagesMerkles: IMerkleEntity[] = getter(HOSTED_DB)[
-      HOSTED_MESSAGES_MERKLES
-    ];
-    const rows: IMerkleEntity[] = messagesMerkles.filter(
-      (merkle) => merkle.groupId === groupId
+    const rows: IMerkleEntity[] = (getHostedDBMessagesMerkles() || []).filter(
+      (merkle: IMerkleEntity) => {
+        return merkle.groupId === groupId;
+      }
     );
     return rows.length ? JSON.parse(rows[0].merkle) : {};
   };
@@ -80,38 +75,43 @@ export const App = () => {
   const addMessages = (groupId: string, messages: IMessage[]): IMerkle => {
     let trie: IMerkle = getMerkle(groupId);
 
-    const hostedDB = getter(HOSTED_DB);
-    const hostedDBMessages: IMessage[] = hostedDB[HOSTED_MESSAGES];
-    const hostedDBMessagesMerkles: IMerkle[] =
-      hostedDB[HOSTED_MESSAGES_MERKLES];
-
     for (let message of messages) {
-      const { column, table, row, timestamp, value } = message;
-      const check = hostedDBMessages.findIndex(
-        (msg) => `${groupId}:${msg.timestamp}` === `${groupId}:${timestamp}`
-      );
+      const { timestamp } = message;
+      const check = (getHostedDBMessages() || []).findIndex((msg: IMessage) => {
+        return `${groupId}:${msg.timestamp}` === `${groupId}:${timestamp}`;
+      });
 
       if (check === -1) {
         extendedSetter({
           setterProps: {
             item: HOSTED_DB,
             obj: {
-              ...hostedDB,
-              [HOSTED_MESSAGES]: [...hostedDBMessages, message],
+              ...getHostedDB(),
+              [HOSTED_MESSAGES]: [...(getHostedDBMessages() || []), message],
             },
           },
         });
         trie = insert({ clock: unpack(timestamp), trie });
       }
 
+      const insertOrReplace = (arr: IMerkleEntity[], item: IMerkleEntity) => {
+        const cp = [...arr];
+        const id = cp.findIndex((el) => el.groupId === item.groupId);
+        if (id > -1) cp[id] = item;
+        else cp.push(item);
+        return cp;
+      };
+
       extendedSetter({
         setterProps: {
           item: HOSTED_DB,
           obj: {
-            ...hostedDB,
+            ...getHostedDB(),
             [HOSTED_MESSAGES_MERKLES]: [
-              ...hostedDBMessagesMerkles,
-              { groupId, merkle: JSON.stringify(trie) },
+              ...insertOrReplace(getHostedDBMessagesMerkles() || [], {
+                groupId,
+                merkle: JSON.stringify(trie),
+              }),
             ],
           },
         },
@@ -124,37 +124,27 @@ export const App = () => {
     const messages = options.messages || [];
     const trie = addMessages(options.groupId, messages);
 
-    const hostedDB = getter(HOSTED_DB);
-    const hostedDBMessages: IMessage[] = hostedDB[HOSTED_MESSAGES];
-
-    extendedSetter({
-      setterProps: {
-        item: HOSTED_DB,
-        obj: {
-          ...hostedDB,
-          [HOSTED_MESSAGES]: [...hostedDBMessages, ...(messages || [])],
-        },
-      },
-    });
-
     let newMessages: IMessage[] = [];
     if (options.merkle) {
       let diffTime = difference(trie, options.merkle);
       if (diffTime) {
         let timestamp = initialize({ nodeId: options.clientId, now: diffTime });
-
-        const msgs: IMessage[] = getter(HOSTED_DB)[HOSTED_MESSAGES];
-        newMessages = msgs.filter(
-          (message) =>
+        newMessages = getHostedDBMessages().filter((message: IMessage) => {
+          return (
             message.timestamp > pack(timestamp) &&
-            timestamp.nodeId !== options.clientId
-        );
+            unpack(message.timestamp).nodeId !== options.clientId
+          );
+        });
       }
     }
 
+    // mock API response
     return {
-      messages: newMessages,
-      merkle: trie,
+      status: "ok",
+      data: {
+        messages: newMessages,
+        merkle: trie,
+      },
     };
   };
 
@@ -178,23 +168,25 @@ export const App = () => {
       {nodes.map((node) => (
         <Node key={node.nodeId} nodeId={node.nodeId} handleSync={sync} />
       ))}
-      {state && state[HOSTED_MESSAGES] && !!state[HOSTED_MESSAGES].length && (
-        <div
-          css={{
-            border: "2px solid #0670de",
-            borderRadius: 4,
-            display: "flex",
-            flexDirection: "column",
-            padding: 12,
-          }}
-        >
-          {state[HOSTED_MESSAGES].filter((el) => el.table === LOCAL_TODOS).map(
-            (todo) => {
-              return <div key={todo.row}>{todo.value}</div>;
-            }
-          )}
-        </div>
-      )}
+      {getHostedDB() &&
+        getHostedDBMessages() &&
+        !!getHostedDBMessages().length && (
+          <div
+            css={{
+              border: "2px solid #0670de",
+              borderRadius: 4,
+              display: "flex",
+              flexDirection: "column",
+              padding: 12,
+            }}
+          >
+            {getHostedDBMessages()
+              .filter((el: IMessage) => el.table === LOCAL_TODOS)
+              .map((todo: IMessage) => {
+                return <div key={todo.row}>{todo.value}</div>;
+              })}
+          </div>
+        )}
     </div>
   );
 };

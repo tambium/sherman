@@ -1,4 +1,11 @@
 import { IMerkle } from "../../../../packages/sherman-merkle";
+import {
+  HOSTED_MESSAGES_MERKLES,
+  HOSTED_MESSAGES,
+  LOCAL_MESSAGES,
+  LOCAL_TABLES,
+  LOCAL_TODOS,
+} from "../constants";
 
 export interface IMessage {
   column: string;
@@ -24,15 +31,14 @@ export interface IMerkleEntity {
 }
 
 export interface IHostedDB {
-  messages: IMessage[];
-  messagesMerkles: IMerkleEntity[];
+  [HOSTED_MESSAGES]: IMessage[];
+  [HOSTED_MESSAGES_MERKLES]: IMerkle[];
 }
 
 export interface ILocalDB {
-  messages: IMessage[];
-  tables: {
-    [key: string]: IRow[];
-    todos: ITodo[];
+  [LOCAL_MESSAGES]: IMessage[];
+  [LOCAL_TABLES]: {
+    [LOCAL_TODOS]: ITodo[];
   };
 }
 
@@ -41,4 +47,17 @@ export interface ISyncOptions {
   groupId: string;
   merkle: IMerkle;
   messages: IMessage[];
+}
+
+export interface ISyncData {
+  groupId?: string;
+  clientId?: string;
+  messages: IMessage[];
+  merkle: IMerkle;
+}
+
+export interface ISyncResponse {
+  status: string;
+  reason?: string;
+  data: ISyncData;
 }
