@@ -8,15 +8,23 @@ import {
   send,
   unpack,
 } from "../../../../../packages/sherman-clock";
-import { insert } from "../../../../../packages/sherman-merkle";
+import { difference, insert } from "../../../../../packages/sherman-merkle";
 import {
+  ILocalDB,
   IMessage,
   IRow,
   ISyncOptions,
   ISyncResponse,
   ITodo,
 } from "../../types";
-import { getLocalDB, setter, constructLocalDB } from "../../utils/localStorage";
+import {
+  getLocalDB,
+  setter,
+  constructLocalDB,
+  getLocalDBTables,
+  getLocalDBTodos,
+  getLocalDBMessages,
+} from "../../utils/localStorage";
 import { isEmpty } from "../../utils/objects";
 import { LOCAL_MESSAGES, LOCAL_TABLES, LOCAL_TODOS } from "../../constants";
 
@@ -50,22 +58,28 @@ const generateMessages = (
   }));
 };
 
-export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
-  React.useEffect(() => {
-    if (isEmpty(getLocalDB(nodeId))) {
-      const base = {
-        [LOCAL_MESSAGES]: [],
-        [LOCAL_TABLES]: {
-          [LOCAL_TODOS]: [],
-        },
-      };
-      setter(constructLocalDB(nodeId), base);
-    }
+const initialState = {
+  [LOCAL_MESSAGES]: [],
+  [LOCAL_TABLES]: {
+    [LOCAL_TODOS]: [],
+  },
+};
 
-    sync();
-  }, []);
-
+const useIsMounted = () => {
   const isMounted = React.useRef(false);
+  React.useEffect(() => {
+    isMounted.current = true;
+    return () => (isMounted.current = false);
+  }, []);
+  return isMounted;
+};
+
+export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
+  const isMounted = useIsMounted();
+  const [state, setState] = React.useState<ILocalDB>(initialState);
+  const [isOnline, setOnline] = React.useState(true);
+  const [inputs, setInputs] = React.useState(initialInputValues);
+
   const node = React.useRef({
     clock: initialize({
       nodeId,
@@ -74,14 +88,34 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     merkle: {},
   });
 
-  const [isOnline, setOnline] = React.useState(true);
-  const [inputs, setInputs] = React.useState(initialInputValues);
+  const extendedSetter = ({
+    setterProps,
+  }: {
+    setterProps: {
+      item: string;
+      obj: {
+        [LOCAL_MESSAGES]: IMessage[];
+        [LOCAL_TABLES]: {
+          [LOCAL_TODOS]: ITodo[];
+        };
+      };
+    };
+  }) => {
+    setState(setterProps.obj);
+    return setter(setterProps.item, setterProps.obj);
+  };
 
   React.useEffect(() => {
-    if (isMounted.current && isOnline) {
-      handleSync();
-    } else {
-      isMounted.current = true;
+    if (isEmpty(getLocalDB(nodeId))) {
+      extendedSetter({
+        setterProps: { item: constructLocalDB(nodeId), obj: initialState },
+      });
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (isMounted.current) {
+      if (isOnline) sync();
     }
   }, [isOnline]);
 
@@ -99,14 +133,13 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
      * negative: first sorted before second
      * zero: no changes are made to sort order
      */
-    const localDB = getLocalDB(nodeId);
-    const localMessages = localDB[LOCAL_MESSAGES];
-
-    let sortedMessages = [...localMessages].sort((first, second) => {
-      if (first.timestamp < second.timestamp) return 1;
-      else if (first.timestamp > second.timestamp) return -1;
-      return 0;
-    });
+    let sortedMessages = [...getLocalDBMessages(nodeId)].sort(
+      (first, second) => {
+        if (first.timestamp < second.timestamp) return 1;
+        else if (first.timestamp > second.timestamp) return -1;
+        return 0;
+      }
+    );
     messages.forEach((message) => {
       let existingMessage = sortedMessages.find(
         (instance) =>
@@ -121,42 +154,44 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
   };
 
   const apply = (message: IMessage) => {
-    const localDB = getLocalDB(nodeId);
-    const table = localDB[LOCAL_TABLES][message.table];
-
+    const table = getLocalDBTables(nodeId)[message.table];
     if (!table) throw new Error(`Table \`${message.table}\` does not exist.`);
 
     const row = table.find((row: IRow) => row.id === message.row);
 
     if (!row) {
-      const localDB = getLocalDB(nodeId);
-      const localTables = localDB[LOCAL_TABLES];
-
       const updated = [...table];
       updated.push({
         id: message.row,
         [message.column]: message.value,
       });
 
-      setter(constructLocalDB(nodeId), {
-        ...localDB,
-        [LOCAL_TABLES]: {
-          ...localTables,
-          [message.table]: updated,
+      extendedSetter({
+        setterProps: {
+          item: constructLocalDB(nodeId),
+          obj: {
+            ...getLocalDB(nodeId),
+            [LOCAL_TABLES]: {
+              ...getLocalDBTables(nodeId),
+              [message.table]: updated,
+            },
+          },
         },
       });
     } else {
-      const localDB = getLocalDB(nodeId);
-      const localTables = localDB[LOCAL_TABLES];
-
       const updated = [...table];
       updated[message.column] = message.value;
 
-      setter(constructLocalDB(nodeId), {
-        ...localDB,
-        [LOCAL_TABLES]: {
-          ...localTables,
-          [message.table]: updated,
+      extendedSetter({
+        setterProps: {
+          item: constructLocalDB(nodeId),
+          obj: {
+            ...getLocalDB(nodeId),
+            [LOCAL_TABLES]: {
+              ...getLocalDBTables(nodeId),
+              [message.table]: updated,
+            },
+          },
         },
       });
     }
@@ -179,11 +214,14 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
           }),
         };
 
-        const localDB = getLocalDB(nodeId);
-        const localMessages = localDB[LOCAL_MESSAGES];
-        setter(constructLocalDB(nodeId), {
-          ...localDB,
-          [LOCAL_MESSAGES]: [...localMessages, message],
+        extendedSetter({
+          setterProps: {
+            item: constructLocalDB(nodeId),
+            obj: {
+              ...getLocalDB(nodeId),
+              [LOCAL_MESSAGES]: [...getLocalDBMessages(nodeId), message],
+            },
+          },
         });
       }
     });
@@ -201,9 +239,20 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     applyMessages(messages);
   };
 
-  const sync = (initialMessages: IMessage[] = []) => {
+  const sync = (
+    initialMessages: IMessage[] = [],
+    since: number | null = null
+  ): undefined => {
     if (!isOnline) return;
     let messages = initialMessages;
+
+    if (since) {
+      let timestamp = initialize({ nodeId, now: since });
+      const localMessages: IMessage[] = getLocalDB(nodeId)[LOCAL_MESSAGES];
+      messages = localMessages.filter(
+        (message) => message.timestamp >= pack(timestamp)
+      );
+    }
 
     const result = handleSync({
       clientId: node.current.clock.nodeId,
@@ -219,6 +268,18 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     if (result.data.messages.length > 0) {
       receiveMessages(result.data.messages);
     }
+
+    let diffTime = difference(result.data.merkle, node.current.merkle);
+
+    if (diffTime) {
+      if (since && since === diffTime) {
+        throw new Error(
+          `A problem occured whilst syncing node ID ${nodeId} with the server.`
+        );
+      }
+
+      return sync([], diffTime);
+    }
   };
 
   const sendMessages = (messages: IMessage[]) => {
@@ -233,8 +294,6 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
     });
     sendMessages(messages);
   };
-
-  const localDB = getLocalDB(nodeId);
 
   return (
     <div
@@ -253,16 +312,21 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
         <span css={{ fontWeight: 600 }}>nodeId:</span>
         {nodeId}
       </span>
-      <div css={{ marginBottom: 8 }}>
-        <label css={{ fontWeight: 600 }} htmlFor="online">
-          isOnline:
-        </label>
-        <input
-          checked={isOnline}
-          name="online"
-          onChange={() => setOnline((prevState) => !prevState)}
-          type="checkbox"
-        />
+      <div css={{ display: "flex" }}>
+        <div css={{ marginBottom: 8, marginRight: 4 }}>
+          <label css={{ fontWeight: 600 }} htmlFor="online">
+            isOnline:
+          </label>
+          <input
+            checked={isOnline}
+            name="online"
+            onChange={() => setOnline((prevState) => !prevState)}
+            type="checkbox"
+          />
+        </div>
+        <div css={{ marginBottom: 8, marginLeft: 4 }}>
+          <button onClick={() => sync()}>Sync</button>
+        </div>
       </div>
       <div css={{ alignItems: "center", display: "flex", marginBottom: 8 }}>
         <label css={{ fontWeight: 600 }} htmlFor="logical">
@@ -282,10 +346,10 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
         />
         <button onClick={addTodo}>Add</button>
       </div>
-      {localDB &&
-        localDB[LOCAL_TABLES] &&
-        localDB[LOCAL_TABLES][LOCAL_TODOS] &&
-        !!localDB[LOCAL_TABLES][LOCAL_TODOS].length && (
+      {getLocalDB(nodeId) &&
+        getLocalDBTables(nodeId) &&
+        getLocalDBTodos(nodeId) &&
+        !!getLocalDBTodos(nodeId).length && (
           <div
             style={{
               border: "2px solid #C0C8D2",
@@ -296,7 +360,7 @@ export const Node: React.FC<NodeProps> = ({ handleSync, nodeId }) => {
               padding: 12,
             }}
           >
-            {localDB[LOCAL_TABLES][LOCAL_TODOS].map((todo: ITodo) => {
+            {getLocalDBTodos(nodeId).map((todo: ITodo) => {
               return <div key={todo.id}>{todo.title}</div>;
             })}
           </div>
