@@ -1,14 +1,21 @@
 {
   "name": "@tambium/sherman-merkle",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "src/index.ts",
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "rm -rf dist && tsc -p ./tsconfig.json"
   },
   "dependencies": {
-    "@tambium/sherman-clock": "1.0.0"
+    "@tambium/sherman-clock": "^0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^3.9.3"
   }
 }

@@ -1,7 +1,15 @@
 {
   "name": "@tambium/sherman",
+  "license": "Apache-2.0",
   "private": true,
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "build": "lerna exec --parallel yarn run build",
+    "release": "lerna publish from-package"
+  },
+  "devDependencies": {
+    "lerna": "^3.20.2"
+  }
 }

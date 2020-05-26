@@ -2,7 +2,7 @@
   "name": "todo-list",
   "version": "1.0.0",
   "main": "src/index.tsx",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "start": "parcel index.html --no-cache"
   },
