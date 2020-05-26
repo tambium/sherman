@@ -1,9 +1,12 @@
 {
   "name": "@tambium/sherman-merkle",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "module": "src/index.ts",
+  "files": [
+    "dist"
+  ],
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public",
