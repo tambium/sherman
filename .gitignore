@@ -10,8 +10,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # builds
-
 dist/
+
+# ts compilation cache
+*.tsbuildinfo
 
 # OS
 .DS_Store

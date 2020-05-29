@@ -4,5 +4,6 @@
   "compilerOptions": {
     "downlevelIteration": true,
     "outDir": "./dist"
-  }
+  },
+  "references": [{ "path": "../sherman-clock" }]
 }

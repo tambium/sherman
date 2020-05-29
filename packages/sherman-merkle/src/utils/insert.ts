@@ -1,4 +1,5 @@
-import { Clock, hash as clockHash } from "@tambium/sherman-clock";
+import type { Clock } from "@tambium/sherman-clock";
+import { hash as clockHash } from "@tambium/sherman-clock";
 import { IMerkle } from "../types";
 import { insertKey } from "./insertKey";
 

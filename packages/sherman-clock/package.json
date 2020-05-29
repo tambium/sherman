@@ -1,9 +1,8 @@
 {
   "name": "@tambium/sherman-clock",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "module": "src/index.ts",
   "files": [
     "dist"
   ],
@@ -13,7 +12,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p ./tsconfig.json"
+    "build": "rm -rf dist && rm tsconfig.tsbuildinfo && tsc -p ./tsconfig.json"
   },
   "devDependencies": {
     "@types/murmurhash": "^0.0.1",

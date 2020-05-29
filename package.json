@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "lerna exec --parallel yarn run build",
+    "build": "yarn workspaces run build",
     "release": "lerna publish from-package"
   },
   "devDependencies": {
